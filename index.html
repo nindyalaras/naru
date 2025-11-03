@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NARU Centralized Dashboard (Functional)</title>
+    <!-- Impor Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Impor Font Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Impor Leaflet.js CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    
+    <!-- Impor HLS.js untuk memutar stream CCTV -->
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+
+    <style>
+        /* Menggunakan font Inter sebagai default */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a; /* slate-900 */
+        }
+
+        /* Styling scrollbar kustom */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #1e293b; /* slate-800 */ }
+        ::-webkit-scrollbar-thumb { background: #475569; /* slate-600 */ border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; /* slate-500 */ }
+
+        /* z-index dinaikkan drastis agar di atas peta Leaflet */
+        #overlayModal { z-index: 1050; } 
+        #videoReportModal { z-index: 1060; }
+        /* MODIFIKASI: customAlertModal dihapus karena kalkulator dihapus */
+        
+        /* Animasi dan Style untuk Marker Peta */
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.7; transform: scale(1.1); }
+        }
+        
+        /* Animasi fade-in untuk insight baru */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in {
+            animation: fadeIn 0.5s ease-out;
+        }
+        
+        .cctv-map-icon {
+            background-color: #ef4444; /* red-500 */
+            border-radius: 9999px;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #fef2f2; /* red-50 */
+            box-shadow: 0 0 5px #ef4444;
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
+        .weather-map-icon {
+            color: #22d3ee; /* cyan-400 */
+            width: 24px;
+            height: 24px;
+        }
+        
+        .leaflet-popup-content-wrapper {
+            background-color: #1e293b; /* slate-800 */
+            color: #e2e8f0; /* slate-200 */
+            border: 1px solid #334155; /* slate-700 */
+            box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+        }
+        .leaflet-popup-content {
+            font-family: 'Inter', sans-serif;
+        }
+        .leaflet-popup-tip {
+            background-color: #1e293b; /* slate-800 */
+        }
+        .leaflet-popup-close-button {
+            color: #e2e8f0; /* slate-200 */
+        }
+        .leaflet-popup-close-button:hover {
+            color: #fff;
+        }
+        .leaflet-control-attribution a {
+            color: #94a3b8; /* slate-400 */
+        }
+
+    </style>
+</head>
+<body class="text-gray-200">
+
+    <div class="flex h-screen">
+        <!-- ===== Sidebar ===== -->
+        <aside class="w-64 flex-shrink-0 bg-white text-gray-800 flex flex-col border-r border-gray-200">
+            <!-- Logo Telkomsel -->
+            <div class="h-20 flex items-center justify-center px-6 border-b">
+                <img src="https://placehold.co/150x40/E53E3E/FFFFFF?text=Telkomsel&font=inter" alt="Logo Telkomsel" class="h-10">
+            </div>
+
+            <!-- User Profile -->
+            <div class="p-4 border-b">
+                <div class="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                    <img class="h-10 w-10 rounded-full object-cover" src="https://placehold.co/40x40/cccccc/333333?text=BP" alt="User Avatar">
+                    <div>
+                        <p class="text-sm font-semibold text-gray-900">Budi Prasetyo</p>
+                        <p class="text-xs text-gray-500">Project Manager</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Menu Navigasi -->
+            <nav class="flex-1 overflow-y-auto pt-4 space-y-2 px-4">
+                <div class="flex items-center space-x-3 px-3 py-2 text-sm font-medium text-gray-500 rounded-lg">
+                    <span>NARU 2025</span>
+                </div>
+                
+                <a href="#" class="flex items-center space-x-3 px-3 py-2 text-sm font-semibold text-white bg-red-600 rounded-lg shadow-md">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h12a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V6z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9h4m-4 4h4m2-4h.01M6 9h.01M6 13h.01M10 17h.01M14 17h.01"></path></svg>
+                    <span>Centralized View</span>
+                </a>
+                <a href="#" class="flex items-center space-x-3 px-3 py-2 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-100">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-1.657-1.343-3-3-3H7m10 0v-2a3 3 0 00-1.644-2.73M17 20h5M7 15H2v-2a3 3 0 015.356-1.857M7 15H4m3 0v-2c0-1.657 1.343-3-3-3h3m-3 0v-2a3 3 0 011.644-2.73M7 15v-2a3 3 0 013-3m0 0V4m0 0h3m-3 0H7m3 0v6"></path></svg>
+                    <span>Movement Subscribers</span>
+                </a>
+                <a href="#" class="flex items-center space-x-3 px-3 py-2 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-100">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0h6m6 0v-6a2 2 0 00-2-2h-2a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2z"></path></svg>
+                    <span>Network Productivity</span>
+                </a>
+                <a href="#" class="flex items-center space-x-3 px-3 py-2 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-100">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071a10 10 0 0114.142 0M1.394 8.536a14.5 14.5 0 0121.212 0"></path></svg>
+                    <span>NHI & 5G Performance</span>
+                </a>
+                <a href="#" class="flex items-center space-x-3 px-3 py-2 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-100">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
+                    <span>Activity</span>
+                </a>
+                <a href="#" class="flex items-center space-x-3 px-3 py-2 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-100">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                    <span>POI Monitoring</span>
+                </a>
+                <a href="#" class="flex items-center space-x-3 px-3 py-2 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-100">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                    <span>Autonomous Network</span>
+                </a>
+                <a href="#" class="flex items-center space-x-3 px-3 py-2 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-100">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"></path></svg>
+                    <span>ITOC</span>
+                </a>
+                <a href="#" class="flex items-center space-x-3 px-3 py-2 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-100">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6-4h.01M10 16h.01"></path></svg>
+                    <span>Inbound Roamer</span>
+                </a>
+                <a href="#" class="flex items-center space-x-3 px-3 py-2 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-100">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+                    <span>Outbound Roamer</span>
+                </a>
+                <a href="#" class="flex items-center space-x-3 px-3 py-2 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-100">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                    <span>Gallery News</span>
+                </a>
+            </nav>
+        </aside>
+        <!-- ===== /Sidebar ===== -->
+
+        <!-- ===== Main Content ===== -->
+        <main class="flex-1 overflow-y-auto p-6 md:p-8">
+            <!-- Header Utama -->
+            <header class="flex justify-between items-center mb-6">
+                <div>
+                    <!-- Breadcrumbs -->
+                    <nav class="text-sm font-medium" aria-label="Breadcrumb">
+                        <ol class="list-none p-0 inline-flex">
+                            <li class="flex items-center">
+                                <span class="text-gray-400">Home</span>
+                                <svg class="fill-current w-3 h-3 mx-3 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><path d="M285.476 272.971L91.132 467.314c-9.373 9.373-24.569 9.373-33.941 0l-22.667-22.667c-9.357-9.357-9.375-24.522-.04-33.901L188.505 256 34.484 101.255c-9.335-9.379-9.317-24.544.04-33.901l22.667-22.667c9.373-9.373 24.569 9.373 33.941 0L285.475 239.03c9.373 9.372 9.373 24.568.001 33.941z"/></svg>
+                            </li>
+                            <li class="flex items-center">
+                                <span class="text-white">Centralized View</span>
+                            </li>
+                        </ol>
+                    </nav>
+                    <h1 class="text-3xl font-bold text-white mt-1">Centralized View Dashboard</h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <!-- Filter Tanggal -->
+                    <button class="flex items-center space-x-2 bg-slate-800 text-white px-4 py-2 rounded-lg shadow hover:bg-slate-700">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                        <span>2025-10-30</span>
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </button>
+                    <!-- Tombol Light Mode (simulasi) -->
+                    <button class="p-2 bg-slate-800 rounded-lg shadow hover:bg-slate-700">
+                        <svg class="w-5 h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                    </button>
+                </div>
+            </header>
+
+            <!-- ===== Konten Dashboard Utama ===== -->
+            <div class="space-y-6">
+                <!-- 1. KPI Summary Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <!-- Card: Total Payload -->
+                    <div class="bg-slate-800 p-6 rounded-lg shadow-lg flex items-center space-x-4">
+                        <div class="p-3 rounded-full bg-blue-600 bg-opacity-30 text-blue-300">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7a8 8 0 0116 0M12 11a2 2 0 100-4 2 2 0 000 4z"></path></svg>
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium text-gray-400">Total Payload</p>
+                            <p class="text-3xl font-bold text-white">4.21 PB</p>
+                            <p class="text-xs text-green-400 flex items-center">
+                                <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"></path></svg>
+                                <span>+8.2% vs Kemarin</span>
+                            </p>
+                        </div>
+                    </div>
+                    <!-- Card: Avg Throughput -->
+                    <div class="bg-slate-800 p-6 rounded-lg shadow-lg flex items-center space-x-4">
+                        <div class="p-3 rounded-full bg-green-600 bg-opacity-30 text-green-300">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium text-gray-400">Avg. Throughput</p>
+                            <p class="text-3xl font-bold text-white">25.4 Mbps</p>
+                            <p class="text-xs text-red-400 flex items-center">
+                                <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path></svg>
+                                <span>-1.5% vs Kemarin</span>
+                            </p>
+                        </div>
+                    </div>
+                    <!-- Card: Network Availability -->
+                    <div class="bg-slate-800 p-6 rounded-lg shadow-lg flex items-center space-x-4">
+                        <div class="p-3 rounded-full bg-teal-600 bg-opacity-30 text-teal-300">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium text-gray-400">Network Availability</p>
+                            <p class="text-3xl font-bold text-white">99.92%</p>
+                            <p class="text-xs text-green-400 flex items-center">
+                                <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"></path></svg>
+                                <span>+0.01% vs Kemarin</span>
+                            </p>
+                        </div>
+                    </div>
+                    <!-- Card: Down Sites -->
+                    <div class="bg-slate-800 p-6 rounded-lg shadow-lg flex items-center space-x-4">
+                        <div class="p-3 rounded-full bg-red-600 bg-opacity-30 text-red-300">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path></svg>
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium text-gray-400">Down Sites (24H)</p>
+                            <p class="text-3xl font-bold text-white">49</p>
+                            <p class="text-xs text-gray-400 flex items-center">
+                                <span>3 major, 46 minor</span>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Grid untuk Peta, Insights, dan Hall of Fame -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    
+                    <!-- 2. CCTV & Weather Overlay -->
+                    <div class="lg:col-span-2 bg-slate-800 p-6 rounded-lg shadow-lg">
+                        <div class="flex justify-between items-center mb-4">
+                            <h2 class="text-xl font-semibold text-white">Map Overlay (Heatmap, Weather, CCTV)</h2>
+                            <div class="flex space-x-2">
+                                <button id="btn-heatmap" onclick="toggleMapLayer('heatmap')" class="map-toggle-btn px-3 py-1 text-xs font-medium rounded-full bg-blue-600 text-white cursor-pointer transition-colors">Heatmap</button>
+                                <button id="btn-weather" onclick="toggleMapLayer('weather')" class="map-toggle-btn px-3 py-1 text-xs font-medium rounded-full bg-gray-600 text-white cursor-pointer hover:bg-slate-700 transition-colors">Weather</button>
+                                <button id="btn-cctv" onclick="toggleMapLayer('cctv')" class="map-toggle-btn px-3 py-1 text-xs font-medium rounded-full bg-gray-600 text-white cursor-pointer hover:bg-slate-700 transition-colors">CCTV</button>
+                            </div>
+                        </div>
+                        
+                        <!-- Kontainer Peta -->
+                        <div class="relative w-full h-[450px] bg-slate-700 rounded-lg overflow-hidden">
+                            <div id="map-container" class="w-full h-full"></div>
+                            
+                            <!-- Keterangan/Legenda Peta -->
+                            <div class="absolute bottom-4 left-4 bg-slate-900 bg-opacity-80 p-3 rounded-lg text-xs space-y-2 z-[401]"> <!-- z-index dinaikkan -->
+                                <h4 class="font-bold mb-2">Legenda</h4>
+                                <div id="legend-cctv" class="map-legend-item flex items-center space-x-2 hidden">
+                                    <span class="w-4 h-4 rounded-full bg-red-500 cctv-pin"></span>
+                                    <span>CCTV Aktif</span>
+                                </div>
+                                <div id="legend-weather" class="map-legend-item flex items-center space-x-2 hidden">
+                                    <svg class="w-4 h-4 text-cyan-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-1.72-9.77A4.5 4.5 0 0012 5.03a4.5 4.5 0 00-4.14 2.51A4.5 4.5 0 006 10.5M3 15h18"></path></svg>
+                                    <span>Cuaca: Hujan</span>
+                                </div>
+                                <div id="legend-heatmap" class="map-legend-item mt-2">
+                                    <span class="font-medium">Heatmap Kepadatan (Crowd)</span>
+                                    <div class="flex items-center space-x-1 mt-1">
+                                        <span class="text-xs text-green-400">Normal</span>
+                                        <div class="w-16 h-2 rounded-full bg-gradient-to-r from-green-500 via-yellow-500 to-red-500"></div>
+                                        <span class="text-xs text-red-400">Padat</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 3. Smart Insight -->
+                    <div class="lg:col-span-1 bg-slate-800 p-6 rounded-lg shadow-lg flex flex-col h-[522px]">
+                        <h2 class="text-xl font-semibold text-white mb-4">Smart Insight (Rule-Based)</h2>
+                        <!-- MODIFIKASI: space-y-4 dipindah ke div internal -->
+                        <div class="flex-1 overflow-y-auto pr-2">
+                            <div id="insight-container" class="space-y-4">
+                                <!-- Konten akan diisi oleh JavaScript -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <!-- 4. Mini Hall of Fame -->
+                    <div class="lg:col-span-1 bg-slate-800 p-6 rounded-lg shadow-lg">
+                        <h2 class="text-xl font-semibold text-white mb-6 text-center">🏆 Mini Hall of Fame (Top 3 Region)</h2>
+                        <div class="flex justify-center items-end space-x-2 h-72">
+                            <!-- Peringkat 2 -->
+                            <div class="w-1/3 text-center">
+                                <div class="bg-slate-700 p-4 rounded-lg border-2 border-gray-500 relative">
+                                    <div class="absolute -top-5 left-1/2 -translate-x-1/2 bg-gray-500 text-white font-bold text-lg w-10 h-10 rounded-full flex items-center justify-center border-4 border-slate-800">2</div>
+                                    <svg class="w-12 h-12 mx-auto text-gray-400 mt-4" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M10 2a8 8 0 100 16 8 8 0 000-16zM6.162 6.872a.75.75 0 01.78-.02l2.478 1.238c.17.085.17.317 0 .402l-2.478 1.239a.75.75 0 01-.78-.02L4.09 8.492a.75.75 0 010-.738l2.072-1.238zM13.838 6.872a.75.75 0 00-.78-.02L10.99 8.09a.75.75 0 000 .402l2.07 1.035a.75.75 0 00.78-.02l2.072-1.238a.75.75 0 000-.738l-2.072-1.238zM6.162 11.872a.75.75 0 01.78-.02l2.478 1.238c.17.085.17.317 0 .402l-2.478 1.239a.75.75 0 01-.78-.02L4.09 13.492a.75.75 0 010-.738l2.072-1.238zM13.838 11.872a.75.75 0 00-.78-.02L10.99 13.09a.75.75 0 000 .402l2.07 1.035a.75.75 0 00.78-.02l2.072-1.238a.75.75 0 000-.738l-2.072-1.238z" clip-rule="evenodd"></path></svg>
+                                    <h3 class="font-semibold text-white mt-3">SUMBAGUT</h3>
+                                    <p class="text-xs text-gray-400 mt-2">Payload: 1.1 PB</p>
+                                    <p class="text-xs text-gray-400">Avail: 99.91%</p>
+                                    <button onclick="openVideoReport('SUMBAGUT', 'https://placehold.co/1920x1080/1e293b/94a3b8.mp4?text=Report+SUMBAGUT')" class="mt-3 w-full text-xs bg-red-600 hover:bg-red-700 text-white py-1 px-2 rounded-lg flex items-center justify-center space-x-1">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                                        <span>Video</span>
+                                    </button>
+                                </div>
+                            </div>
+                            <!-- Peringkat 1 -->
+                            <div class="w-1/3 text-center">
+                                <div class="bg-slate-700 p-4 rounded-lg border-2 border-yellow-400 relative mb-4 shadow-lg shadow-yellow-400/20">
+                                    <div class="absolute -top-5 left-1/2 -translate-x-1/2 bg-yellow-400 text-slate-900 font-bold text-lg w-10 h-10 rounded-full flex items-center justify-center border-4 border-slate-800">1</div>
+                                    <svg class="w-16 h-16 mx-auto text-yellow-400 mt-4" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path></svg>
+                                    <h3 class="font-semibold text-white text-lg mt-3">JABAR</h3>
+                                    <p class="text-sm text-gray-300 mt-2">Payload: 1.5 PB</p>
+                                    <p class="text-sm text-gray-300">Avail: 99.94%</p>
+                                    <button onclick="openVideoReport('JABAR', 'https://placehold.co/1920x1080/1e293b/94a3b8.mp4?text=Report+JABAR')" class="mt-3 w-full text-xs bg-red-600 hover:bg-red-700 text-white py-1 px-2 rounded-lg flex items-center justify-center space-x-1">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                                        <span>Video</span>
+                                    </button>
+                                </div>
+                            </div>
+                            <!-- Peringkat 3 -->
+                            <div class="w-1/3 text-center">
+                                <div class="bg-slate-700 p-4 rounded-lg border-2 border-yellow-700 relative">
+                                    <div class="absolute -top-5 left-1/2 -translate-x-1/2 bg-yellow-700 text-white font-bold text-lg w-10 h-10 rounded-full flex items-center justify-center border-4 border-slate-800">3</div>
+                                    <svg class="w-12 h-12 mx-auto text-yellow-800 mt-4" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M10 2a8 8 0 100 16 8 8 0 000-16zM6.162 6.872a.75.75 0 01.78-.02l2.478 1.238c.17.085.17.317 0 .402l-2.478 1.239a.75.75 0 01-.78-.02L4.09 8.492a.75.75 0 010-.738l2.072-1.238zM13.838 6.872a.75.75 0 00-.78-.02L10.99 8.09a.75.75 0 000 .402l2.07 1.035a.75.75 0 00.78-.02l2.072-1.238a.75.75 0 000-.738l-2.072-1.238zM6.162 11.872a.75.75 0 01.78-.02l2.478 1.238c.17.085.17.317 0 .402l-2.478 1.239a.75.75 0 01-.78-.02L4.09 13.492a.75.75 0 010-.738l2.072-1.238zM13.838 11.872a.75.75 0 00-.78-.02L10.99 13.09a.75.75 0 000 .402l2.07 1.035a.75.75 0 00.78-.02l2.072-1.238a.75.75 0 000-.738l-2.072-1.238z" clip-rule="evenodd"></path></svg>
+                                    <h3 class="font-semibold text-white mt-3">JATIM</h3>
+                                    <p class="text-xs text-gray-400 mt-2">Payload: 1.0 PB</p>
+                                    <p class="text-xs text-gray-400">Avail: 99.90%</p>
+                                    <button onclick="openVideoReport('JATIM', 'https://placehold.co/1920x1080/1e293b/94a3b8.mp4?text=Report+JATIM')" class="mt-3 w-full text-xs bg-red-600 hover:bg-red-700 text-white py-1 px-2 rounded-lg flex items-center justify-center space-x-1">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                                        <span>Video</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 5. Centralized Alerts Table -->
+                    <div class="lg:col-span-2 bg-slate-800 p-6 rounded-lg shadow-lg">
+                        <h2 class="text-xl font-semibold text-white mb-4">Centralized Alarms</h2>
+                        <div class="overflow-x-auto h-72">
+                            <table class="w-full text-sm text-left text-gray-300">
+                                <thead class="text-xs text-gray-400 uppercase bg-slate-700">
+                                    <tr>
+                                        <th scope="col" class="px-6 py-3 rounded-l-lg">Timestamp</th>
+                                        <th scope="col" class="px-6 py-3">Region</th>
+                                        <th scope="col" class->Site ID</th>
+                                        <th scope="col" class="px-6 py-3">Alarm</th>
+                                        <th scope="col" class="px-6 py-3 rounded-r-lg">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr class="bg-slate-800 border-b border-slate-700">
+                                        <td class="px-6 py-4">2025-10-30 10:15</td>
+                                        <td class="px-6 py-4">JABAR</td>
+                                        <td class="px-6 py-4">JKT-001A</td>
+                                        <td class="px-6 py-4 font-medium text-red-400">High Packet Loss</td>
+                                        <td class="px-6 py-4"><span class="px-2 py-1 text-xs font-medium rounded-full bg-red-600 text-white">Active</span></td>
+                                    </tr>
+                                    <tr class="bg-slate-800 border-b border-slate-700">
+                                        <td class="px-6 py-4">2025-10-30 10:12</td>
+                                        <td class="px-6 py-4">SULAMPUA</td>
+                                        <td class="px-6 py-4">MKS-034B</td>
+                                        <td class="px-6 py-4 font-medium text-yellow-400">High Latency</td>
+                                        <td class="px-6 py-4"><span class="px-2 py-1 text-xs font-medium rounded-full bg-yellow-500 text-slate-900">Investigating</span></td>
+                                    </tr>
+                                    <tr class="bg-slate-800 border-b border-slate-700">
+                                        <td class="px-6 py-4">2025-10-30 09:55</td>
+                                        <td class="px-6 py-4">JATIM</td>
+                                        <td class="px-6 py-4">SBY-112A</td>
+                                        <td class="px-6 py-4 font-medium text-red-400">Site Down (Power)</td>
+                                        <td class="px-6 py-4"><span class="px-2 py-1 text-xs font-medium rounded-full bg-red-600 text-white">Active</span></td>
+                                    </tr>
+                                    <tr class="bg-slate-800 border-b border-slate-700">
+                                        <td class="px-6 py-4">2025-10-30 09:40</td>
+                                        <td class="px-6 py-4">SUMBAGUT</td>
+                                        <td class="px-6 py-4">MDN-005C</td>
+                                        <td class="px-6 py-4 font-medium text-gray-400">Link Unstable</td>
+                                        <td class="px-6 py-4"><span class="px-2 py-1 text-xs font-medium rounded-full bg-green-600 text-white">Resolved</span></td>
+                                    </tr>
+                                    <tr class="bg-slate-800">
+                                        <td class="px-6 py-4">2025-10-30 09:30</td>
+                                        <td class="px-6 py-4">JABAR</td>
+                                        <td class="px-6 py-4">BDG-078A</td>
+                                        <td class="px-6 py-4 font-medium text-yellow-400">High CPU Load</td>
+                                        <td class="px-6 py-4"><span class="px-2 py-1 text-xs font-medium rounded-full bg-yellow-500 text-slate-900">Investigating</span></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- MODIFIKASI: Kalkulator Arus Lalu Lintas (BPR) DIHAPUS -->
+                
+
+                <!-- Crowd Management (full width) -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <div class="lg:col-span-3 bg-slate-800 p-6 rounded-lg shadow-lg">
+                            <h2 class="text-xl font-semibold text-white mb-4">Crowd Management</h2>
+                            <div class="space-y-3 h-64 overflow-y-auto pr-2">
+                                <p class="text-sm text-gray-400 mb-3">Informasi terkait "bad experiences" untuk pengambilan keputusan cepat.</p>
+                                
+                                <div class="bg-slate-700 p-3 rounded-lg">
+                                    <p class="text-sm font-medium text-white">Kuta, Bali</p>
+                                    <p class="text-xs text-yellow-400">Feedback: "Jaringan sangat lambat, tidak bisa upload." (Source: LBS/Survey)</p>
+                                </div>
+                                <div class="bg-slate-700 p-3 rounded-lg">
+                                    <p class="text-sm font-medium text-white">Stasiun Gambir, Jakarta</p>
+                                    <p class="text-xs text-yellow-400">Feedback: "Antrian 5G Experience Zone terlalu panjang." (Source: CCTV Insight)</p>
+                                </div>
+                                <div class="bg-slate-700 p-3 rounded-lg">
+                                    <p class="text-sm font-medium text-white">Bandara Soetta</p>
+                                    <p class="text-xs text-yellow-400">Feedback: "Sinyal hilang di Terminal 3 Gate 20." (Source: UMP)</p>
+                                </div>
+                                <div class="bg-slate-700 p-3 rounded-lg">
+                                    <p class="text-sm font-medium text-white">Malioboro, Yogyakarta</p>
+                                    <p class="text-xs text-gray-400">Feedback: "VoLTE call drop di area titik nol." (Source: Crowdsource)</p>
+                                </div>
+                            </div>
+                        </div>
+                </div>
+            </div>
+        </main>
+        <!-- ===== /Main Content ===== -->
+    </div>
+
+    <!-- ===== Modal untuk CCTV/Weather/Crowd ===== -->
+    <div id="overlayModal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-800 rounded-lg shadow-2xl max-w-4xl w-full"> 
+            <!-- Modal Header -->
+            <div class="flex justify-between items-center p-4 border-b border-slate-700">
+                <h3 id="modalTitle" class="text-lg font-semibold text-white">Modal Title</h3>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-white">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <!-- Modal Body -->
+            <div class="p-6">
+                <!-- Body CCTV -->
+                <div id="modalBodyCCTV" class="hidden">
+                    <div class="flex flex-col md:flex-row gap-4">
+                        <!-- Kolom Kiri: CCTV Stream & Tombol Video Report -->
+                        <div class="flex-1">
+                            <p class="text-sm text-gray-300 mb-2">Streaming live dari lokasi...</p>
+                            
+                            <!-- Wrapper untuk HLS dan Iframe player -->
+                            <div class="w-full aspect-video bg-black rounded-lg flex items-center justify-center">
+                                <!-- Player untuk HLS (.m3u8) -->
+                                <div id="cctvPlayerContainer" class="w-full h-full">
+                                    <video id="cctvPlayer" class="w-full h-full" controls autoplay muted playsinline></video>
+                                </div>
+                                <!-- Player untuk WebRTC (.html) -->
+                                <div id="cctvIframeContainer" class="w-full h-full">
+                                    <iframe id="cctvIframe" class="w-full h-full" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+                                </div>
+                            </div>
+                            <button onclick="openVideoReport('Bundaran HI', 'https://placehold.co/1920x1080/1e293b/94a3b8.mp4?text=Report+Bundaran+HI')" class="mt-3 w-full bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg flex items-center justify-center space-x-2">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                                <span>Tampilkan Video Report (Upload Region)</span>
+                            </button>
+                        </div>
+                        <!-- Kolom Kanan: Insight Crowd Behavior (Frontend untuk hasil 'backend' BPR) -->
+                        <div class="w-full md:w-72">
+                            <h4 class="text-md font-semibold text-white mb-2">Crowd Behavior Insight</h4>
+                            <div class="bg-slate-700 p-3 rounded-lg space-y-3 h-full">
+                                <div class="flex items-start space-x-2">
+                                    <svg class="w-5 h-5 text-yellow-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                                    <div>
+                                        <p class="text-sm font-medium text-white">Deteksi Antrian Panjang</p>
+                                        <p class="text-xs text-gray-400">Estimasi 10+ menit di Pintu Masuk.</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-start space-x-2">
+                                    <svg class="w-5 h-5 text-red-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-1.657-1.343-3-3-3H7m10 0v-2a3 3 0 00-1.644-2.73M17 20h5M7 15H2v-2a3 3 0 015.356-1.857M7 15H4m3 0v-2c0-1.657 1.343-3-3-3h3m-3 0v-2a3 3 0 011.644-2.73M7 15v-2a3 3 0 013-3m0 0V4m0 0h3m-3 0H7m3 0v6"></path></svg>
+                                    <div>
+                                        <p class="text-sm font-medium text-white">Kepadatan Abnormal</p>
+                                        <p class="text-xs text-gray-400">Terdeteksi di area Plaza.</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-start space-x-2">
+                                    <svg class="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path></svg>
+                                    <div>
+                                        <p class="text-sm font-medium text-white">Arah Pergerakan</p>
+                                        <p class="text-xs text-gray-400">Dominan ke arah Barat.</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-start space-x-2 border-t border-slate-600 pt-3">
+                                    <svg class="w-5 h-5 text-purple-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6M3 3h18M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+                                    <div>
+                                        <p class="text-sm font-medium text-white">Estimasi Jumlah Kendaraan</p>
+                                        <p class="text-xs text-gray-400">~1500 Kendaraan/Jam (Trafik 130% Normal).</p>
+                                    </div>
+                                </div>
+                                <p class="text-xs text-gray-500 text-center pt-2">Based on Google Maps Traffic & Model Estimasi</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Body Weather -->
+                <div id="modalBodyWeather" class="hidden">
+                    <p class="text-sm text-gray-300 mb-2">Data real-time dari API cuaca:</p>
+                    <div class="bg-slate-700 p-4 rounded-lg flex items-center space-x-4">
+                        <svg class="w-16 h-16 text-cyan-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-1.72-9.77A4.5 4.5 0 0012 5.03a4.5 4.5 0 00-4.14 2.51A4.5 4.5 0 006 10.5M3 15h18"></path></svg>
+                        <div>
+                            <p class="text-3xl font-bold text-white">Hujan Ringan</p>
+                            <p class="text-lg text-gray-300">28°C | Kelembapan: 85%</p>
+                            <p class="text-sm text-gray-400">Penting: Hujan dapat menyebabkan redaman sinyal (rain attenuation).</p>
+                        </div>
+                    </div>
+                </div>
+                <!-- Body Crowd -->
+                <div id="modalBodyCrowd" class="hidden">
+                    <p class="text-sm text-gray-300 mb-2">Data kepadatan dari LBS:</p>
+                    <div class="bg-slate-700 p-4 rounded-lg flex items-center space-x-4">
+                        <svg class="w-16 h-16 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-1.657-1.343-3-3-3H7m10 0v-2a3 3 0 00-1.644-2.73M17 20h5M7 15H2v-2a3 3 0 015.356-1.857M7 15H4m3 0v-2c0-1.657 1.343-3-3-3h3m-3 0v-2a3 3 0 011.644-2.73M7 15v-2a3 3 0 013-3m0 0V4m0 0h3m-3 0H7m3 0v6"></path></svg>
+                        <div>
+                            <p class="text-3xl font-bold text-white">Sangat Padat</p>
+                            <p class="text-lg text-gray-300">Est. 5,000+ user/km²</p>
+                            <p class="text-sm text-gray-400">Penting: Potensi network congestion tinggi di area ini.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Video Report -->
+    <div id="videoReportModal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-800 rounded-lg shadow-2xl max-w-3xl w-full">
+            <div class="flex justify-between items-center p-4 border-b border-slate-700">
+                <h3 id="videoModalTitle" class="text-lg font-semibold text-white">Video Report</h3>
+                <button onclick="closeVideoReportModal()" class="text-gray-400 hover:text-white">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <div class="p-6">
+                <div class="w-full aspect-video bg-black rounded-lg">
+                    <video id="videoPlayer" controls class="w-full h-full rounded-lg">
+                        <source id="videoSource" src="" type="video/mp4">
+                        Browser Anda tidak mendukung tag video.
+                    </video>
+                </div>
+                <p class="text-xs text-gray-400 mt-2">Video report yang di-upload oleh region.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODIFIKASI: Modal Kustom untuk Alert DIHAPUS -->
+
+
+    <!-- Impor Leaflet.js JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+    <script>
+        // === Variabel Global untuk Peta ===
+        var map;
+        var cctvLayer, weatherLayer, heatmapLayer;
+        var cctvIcon, weatherIcon;
+        var hls; 
+
+        // === Inisialisasi Peta saat DOM Siap ===
+        document.addEventListener('DOMContentLoaded', function() {
+            // 1. Inisialisasi Peta
+            map = L.map('map-container', {
+                zoomControl: false 
+            }).setView([-2.5, 118.0], 5); 
+
+            // 2. Tambahkan Tile Layer (Peta Dasar) - Dark Mode dari CartoDB
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+                subdomains: 'abcd',
+                maxZoom: 20
+            }).addTo(map);
+
+            // 3. Definisikan Ikon Kustom
+            cctvIcon = L.divIcon({
+                className: 'cctv-map-icon',
+                iconSize: [16, 16]
+            });
+
+            weatherIcon = L.divIcon({
+                className: 'weather-map-icon',
+                iconSize: [24, 24],
+                html: '<svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" d="M3 15a4 4 0 004 4h9a5 5 0 10-1.72-9.77A4.5 4.5 0 0012 5.03a4.5 4.5 0 00-4.14 2.51A4.5 4.5 0 006 10.5M3 15h18"></path></svg>'
+            });
+
+            // 4. Buat Layer Groups
+            cctvLayer = L.layerGroup();
+            weatherLayer = L.layerGroup();
+            heatmapLayer = L.layerGroup();
+
+            // 5. Tambahkan Marker/Data ke Layer Groups
+            
+            // HLS Stream (Bundaran HI)
+            L.marker([-6.1944, 106.8229], {icon: cctvIcon}) 
+                .on('click', () => openModal('cctv', 'Bundaran HI, Jakarta', 'https://cctv.rttmc.dephub.go.id/cctv/stream/playlist/NTABA-BHI.m3u8'))
+                .addTo(cctvLayer);
+
+            // HLS Stream (Bandung)
+            L.marker([-6.9039, 107.6186], {icon: cctvIcon}) 
+                .on('click', () => openModal('cctv', 'Simpang Dago, Bandung', 'https://atcs-dishub.bandung.go.id/cctv/stream/27.m3u8'))
+                .addTo(cctvLayer);
+            
+            // WebRTC Stream (Malang)
+            L.marker([-7.9829, 112.6307], {icon: cctvIcon}) // Alun-alun Malang
+                .on('click', () => openModal('cctv', 'Alun-alun Malang (WebRTC)', 'http://stream.cctv.malangkota.go.id/WebRTCApp/play.html?name=853226045901551050379815'))
+                .addTo(cctvLayer);
+            
+            // Marker non-CCTV
+            L.marker([3.5952, 98.6722], {icon: weatherIcon})
+                .on('click', () => openModal('weather', 'Medan, Sumatera Utara'))
+                .addTo(weatherLayer);
+
+            L.circle([-8.7192, 115.1686], { 
+                radius: 1500,
+                color: '#ef4444',
+                fillColor: '#ef4444',
+                fillOpacity: 0.3,
+                weight: 1
+            }).on('click', () => openModal('crowd', 'Kuta, Denpasar'))
+              .addTo(heatmapLayer);
+              
+            L.circle([-5.1354, 119.4238], {
+                radius: 1000,
+                color: '#f59e0b',
+                fillColor: '#f59e0b',
+                fillOpacity: 0.3,
+                weight: 1
+            }).on('click', () => openModal('crowd', 'Pantai Losari, Makassar'))
+              .addTo(heatmapLayer);
+            
+            // 6. Tampilkan Layer Default (Heatmap)
+            heatmapLayer.addTo(map);
+
+            // Panggil fungsi untuk mengisi insight
+            populateInitialInsights();
+        });
+
+
+        // === Logika Smart Insight (Simulasi) ===
+        const insights = [
+            {
+                type: 'info',
+                icon: '<svg class="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11.676a.09.09 0 01.02-.064l1.13-1.132a.09.09 0 01.127 0l1.13 1.132a.09.09 0 01.02.064A6.002 6.002 0 0112 13a6 6 0 015.546-1.39a.09.09 0 01.147-.064l1.13-1.132a.09.09 0 01.127 0l1.13 1.132a.09.09 0 01.02.064A9.956 9.956 0 0122 12c0 5.523-4.477 10-10 10S2 17.523 2 12c0-1.841.49-3.556 1.356-5.006a.09.09 0 01.02.064l1.13 1.132a.09.09 0 01.127 0l1.13 1.132a.09.09 0 01.02.064A6.002 6.002 0 016 11a6 6 0 015.546-1.39a.09.09 0 01.147-.064l1.13-1.132a.09.09 0 01.127 0l1.13 1.132a.09.09 0 01.02.064A9.956 9.956 0 0122 12c0 5.523-4.477 10-10 10S2 17.523 2 12a9.956 9.956 0 01.055-.676zM12 2a.5.5 0 01.5.5v1a.5.5 0 01-1 0v-1a.5.5 0 01.5-.5zM5.707 3.293a.5.5 0 01.707 0l.707.707a.5.5 0 010 .707l-.707.707a.5.5 0 01-.707 0l-.707-.707a.5.5 0 010-.707zM17.586 3.293a.5.5 0 01.707 0l.707.707a.5.5 0 010 .707l-.707.707a.5.5 0 01-.707 0l-.707-.707a.5.5 0 010-.707z"></path></svg>',
+                message: '<strong>[Roaming Insight]</strong> POI Wisatawan Asing Teringgi: <strong>Candi Borobudur</strong> (naik 15% inbound roamer).',
+                time: 'Baru saja'
+            },
+            {
+                type: 'alert',
+                icon: '<svg class="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 17l-5-5 5-5m-5 5h12"></path></svg>',
+                message: '<strong>[Baseline Alarm]</strong> Avg. Throughput Region JATENG <strong>turun 40%</strong> di bawah baseline.',
+                time: '2 menit lalu'
+            },
+            {
+                type: 'warning',
+                icon: '<svg class="w-5 h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>',
+                message: 'Potensi congestion terdeteksi di <strong>Denpasar</strong>. Kepadatan naik 30%.',
+                time: '5 menit lalu'
+            },
+            {
+                type: 'info',
+                icon: '<svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>',
+                message: '<strong>Region JABAR</strong> mengalami trafik naik <strong>8%</strong> dibanding kemarin.',
+                time: '7 menit lalu'
+            },
+            { 
+                type: 'alert',
+                icon: '<svg class="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path></svg>',
+                message: '<strong>Site MKS-034B (SULAMPUA)</strong> mengalami High Latency. Cek alarm.',
+                time: '11 menit lalu'
+            },
+            { 
+                type: 'info',
+                icon: '<svg class="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-1.72-9.77A4.5 4.5 0 0012 5.03a4.5 4.5 0 00-4.14 2.51A4.5 4.5 0 006 10.5M3 15h18"></path></svg>',
+                message: 'Hujan lebat terdeteksi di <strong>Medan</strong>. Pantau microwave link di area terdampak.',
+                time: '15 menit lalu'
+            }
+        ];
+
+        const insightContainer = document.getElementById('insight-container');
+        let currentInsightIndex = 0;
+
+        function addInsight(isPrepend = true) {
+            if (!insightContainer) return;
+
+            const insight = insights[currentInsightIndex];
+            const insightElement = document.createElement('div');
+            insightElement.className = 'flex space-x-3 p-3 bg-slate-700 rounded-lg';
+            
+            if (isPrepend) {
+                insightElement.classList.add('animate-fade-in');
+            }
+
+            insightElement.innerHTML = `
+                <div class="flex-shrink-0 pt-1">${insight.icon}</div>
+                <div>
+                    <p class="text-sm font-medium text-white">${insight.message}</p>
+                    <p class="text-xs text-gray-400">${insight.time}</p>
+                </div>`;
+            
+            if (isPrepend) {
+                insightContainer.prepend(insightElement);
+                while (insightContainer.children.length > 5) {
+                    insightContainer.removeChild(insightContainer.lastChild);
+                }
+            } else {
+                insightContainer.appendChild(insightElement); 
+            }
+
+            currentInsightIndex = (currentInsightIndex + 1) % insights.length;
+        }
+
+        function populateInitialInsights() {
+            if (!insightContainer) return;
+            insightContainer.innerHTML = ''; 
+            for (let i = 0; i < 5; i++) { 
+                addInsight(false); 
+            }
+            setInterval(() => addInsight(true), 4000); 
+        }
+        
+
+        // === Logika Modal CCTV/Weather/Crowd ===
+        const modal = document.getElementById('overlayModal');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalBodyCCTV = document.getElementById('modalBodyCCTV');
+        const modalBodyWeather = document.getElementById('modalBodyWeather');
+        const modalBodyCrowd = document.getElementById('modalBodyCrowd');
+        
+        const cctvPlayerContainer = document.getElementById('cctvPlayerContainer');
+        const cctvIframeContainer = document.getElementById('cctvIframeContainer');
+        const cctvPlayer = document.getElementById('cctvPlayer');
+        const cctvIframe = document.getElementById('cctvIframe');
+
+
+        function openModal(type, location, dataUrl = null) {
+            modalBodyCCTV.classList.add('hidden');
+            modalBodyWeather.classList.add('hidden');
+            modalBodyCrowd.classList.add('hidden');
+
+            stopCCTV(); 
+
+            if (type === 'cctv') {
+                modalTitle.innerText = `CCTV - ${location}`;
+                modalBodyCCTV.classList.remove('hidden');
+                
+                if (!dataUrl) {
+                    console.error("Tidak ada URL stream CCTV!");
+                    return;
+                }
+                
+                const PROXY_URL = 'https://api.allorigins.win/raw?url=';
+                const proxiedUrl = PROXY_URL + encodeURIComponent(dataUrl);
+
+                if (dataUrl.includes('.m3u8')) {
+                    cctvPlayerContainer.classList.remove('hidden');
+                    cctvIframeContainer.classList.add('hidden');
+
+                    if (Hls.isSupported()) {
+                        hls = new Hls();
+                        hls.on(Hls.Events.ERROR, function (event, data) {
+                            console.error('HLS Error:', data);
+                        });
+                        hls.loadSource(proxiedUrl);
+                        hls.attachMedia(cctvPlayer);
+                        hls.on(Hls.Events.MANIFEST_PARSED, function() {
+                            cctvPlayer.play().catch(e => console.log("Autoplay dicegah:", e));
+                        });
+                    } else if (cctvPlayer.canPlayType('application/vnd.apple.mpegurl')) {
+                        cctvPlayer.src = proxiedUrl;
+                        cctvPlayer.play().catch(e => console.log("Autoplay dicegah:", e));
+                    }
+                } else if (dataUrl.includes('.html') || dataUrl.includes('WebRTC')) {
+                    cctvPlayerContainer.classList.add('hidden');
+                    cctvIframeContainer.classList.remove('hidden');
+                    cctvIframe.src = proxiedUrl;
+                } else {
+                     console.error("Format URL CCTV tidak didukung:", dataUrl);
+                }
+
+            } else if (type === 'weather') {
+                modalTitle.innerText = `Cuaca - ${location}`;
+                modalBodyWeather.classList.remove('hidden');
+            } else if (type === 'crowd') {
+                modalTitle.innerText = `Kepadatan - ${location}`;
+                modalBodyCrowd.classList.remove('hidden');
+            }
+            modal.classList.remove('hidden');
+        }
+
+        function stopCCTV() {
+            if (hls) {
+                hls.destroy();
+            }
+            cctvPlayer.pause();
+            cctvPlayer.src = '';
+            cctvPlayer.removeAttribute('src'); 
+            cctvIframe.src = 'about:blank';
+        }
+
+        function closeModal() {
+            modal.classList.add('hidden');
+            stopCCTV(); 
+        }
+        
+        modal.addEventListener('click', function(event) {
+            if (event.target === modal) {
+                closeModal();
+            }
+        });
+
+        // === Logika Modal Video Report ===
+        const videoModal = document.getElementById('videoReportModal');
+        const videoModalTitle = document.getElementById('videoModalTitle');
+        const videoPlayer = document.getElementById('videoPlayer');
+        const videoSource = document.getElementById('videoSource');
+
+        function openVideoReport(location, videoUrl) {
+            setTimeout(() => {
+                videoModalTitle.innerText = `Video Report - ${location}`;
+                videoSource.setAttribute('src', videoUrl);
+                videoPlayer.load();
+                videoModal.classList.remove('hidden');
+            }, 50);
+        }
+
+        function closeVideoReportModal() {
+            videoModal.classList.add('hidden');
+            videoPlayer.pause();
+            videoSource.setAttribute('src', '');
+        }
+
+        videoModal.addEventListener('click', function(event) {
+            if (event.target === videoModal) {
+                closeVideoReportModal();
+            }
+        });
+
+        // MODIFIKASI: Logika Alert Kustom DIHAPUS
+        
+        
+        // === Logika Toggle Peta ===
+        function toggleMapLayer(layerName) {
+            // 1. Reset semua tombol
+            const buttons = document.querySelectorAll('.map-toggle-btn');
+            buttons.forEach(btn => {
+                btn.classList.remove('bg-blue-600');
+                btn.classList.add('bg-gray-600', 'hover:bg-slate-700');
+            });
+
+            // 2. Reset (sembunyikan) semua legenda
+            const legends = document.querySelectorAll('.map-legend-item');
+            legends.forEach(legend => {
+                legend.classList.add('hidden');
+            });
+
+            // 3. Hapus semua layer dari peta
+            if (map) {
+                if (cctvLayer) map.removeLayer(cctvLayer);
+                if (weatherLayer) map.removeLayer(weatherLayer);
+                if (heatmapLayer) map.removeLayer(heatmapLayer);
+            }
+
+            // 4. Aktifkan tombol & layer & legenda yang dipilih
+            const activeButton = document.getElementById('btn-' + layerName);
+            activeButton.classList.add('bg-blue-600');
+            activeButton.classList.remove('bg-gray-600', 'hover:bg-slate-700');
+
+            const activeLegend = document.getElementById('legend-' + layerName);
+            if (activeLegend) {
+                activeLegend.classList.remove('hidden');
+            }
+
+            if (layerName === 'cctv' && cctvLayer) {
+                cctvLayer.addTo(map);
+            } else if (layerName === 'weather' && weatherLayer) {
+                weatherLayer.addTo(map);
+            } else if (layerName === 'heatmap' && heatmapLayer) {
+                heatmapLayer.addTo(map);
+            }
+        }
+
+        // MODIFIKASI: Logika Kalkulator Arus (BPR) DIHAPUS
+
+    </script>
+</body>
+</html>
+
