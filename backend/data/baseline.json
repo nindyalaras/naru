@@ -1,0 +1,11 @@
+{
+  "regional_baseline": {
+    "JABAR": {"throughput_mbps": 27.0, "payload_pb": 1.38},
+    "JATENG": {"throughput_mbps": 25.0, "payload_pb": 1.10},
+    "JATIM": {"throughput_mbps": 26.0, "payload_pb": 1.00}
+  },
+  "bpr_default": { "alpha": 0.15, "beta": 4 },
+  "links_capacity": {
+    "sample-link": { "qpc": 2000 }
+  }
+}

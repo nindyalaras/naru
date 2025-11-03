@@ -1,0 +1,5 @@
+[
+  {"id":"cctv-bhi","name":"Bundaran HI (HLS)","lat":-6.1944,"lng":106.8229,"url":"https://jmlive.jasamarga.com/hls/7/d2722ae7-7ab2-427c-8238-4871370f38c2/playlist.m3u8","type":"hls"},
+  {"id":"cctv-dago","name":"Simpang Dago, Bandung (HLS)","lat":-6.9039,"lng":107.6186,"url":"https://atcs-dishub.bandung.go.id/cctv/stream/27.m3u8","type":"hls"},
+  {"id":"cctv-malang","name":"Alun-alun Malang (WebRTC)","lat":-7.9829,"lng":112.6307,"url":"http://stream.cctv.malangkota.go.id/WebRTCApp/play.html?name=853226045901551050379815","type":"webrtc"}
+]
